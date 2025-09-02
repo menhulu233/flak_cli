@@ -346,40 +346,45 @@ class App(ctk.CTk):
     def _show_currency_dialog(self):
         '''
         显示货币设置对话框（弹窗）
-        - 窗口大小 600x300
-        - grab_set() 使对话框置顶，阻塞主窗口
-        - 布局：标题、子框架（包含标签、组合框、按钮、汇率显示）
+        - 窗口大小 700x400（略增宽度和高度，容纳控件并提升美观）
+        - grab_set() 置顶阻塞主窗口
+        - 布局：标题、输入框架（两行网格：第一行目标货币选择+汇率显示，第二行按钮）
+        - 优化：调整网格列权重，增加间距，确保“设置目标货币”和“取消”按钮并排，整体布局更清晰
         '''
         dialog = ctk.CTkToplevel(self)  # 创建置顶窗口
         dialog.title("Currency Settings")  # 设置标题
-        dialog.geometry("600x300")  # 设置大小
+        dialog.geometry("650x400")  # 调整窗口大小，增加宽度和高度以容纳控件
         dialog.grab_set()  # 置顶并阻塞主窗口
 
-        lbl_title = ctk.CTkLabel(dialog, text="Currency Settings", font=ctk.CTkFont(size=20, weight="bold"))  # 标题标签
-        lbl_title.pack(pady=12)  # 打包，垂直间距 12
+        # 配置窗口网格，行和列可扩展
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(1, weight=1)
 
-        sub_frm = ctk.CTkFrame(dialog, fg_color="transparent")  # 子框架，透明背景
-        sub_frm.pack(fill="x", padx=24, pady=8)  # 填充 x 方向，水平间距 24，垂直间距 8
+        # 标题
+        lbl_title = ctk.CTkLabel(dialog, text="Currency Settings", font=ctk.CTkFont(size=20, weight="bold"))
+        lbl_title.pack(pady=20)  # 增加垂直间距，改善视觉层次
 
+        # 输入框架
+        input_frm = ctk.CTkFrame(dialog, fg_color="transparent")  # 透明背景
+        input_frm.pack(fill="x", padx=30, pady=20)  # 增加水平间距（30），填充 x 方向
+
+        # 配置输入框架网格，分配列权重以平衡布局
+        input_frm.grid_columnconfigure((0, 2), weight=1)  # 标签列
+        input_frm.grid_columnconfigure((1, 3), weight=2)  # 输入框/显示列
+        input_frm.grid_rowconfigure(0, weight=1)  # 第一行扩展
+
+        # 第一行：目标货币选择和汇率显示
         # 目标货币标签和组合框
-        ctk.CTkLabel(sub_frm, text="Target Currency (set once)", font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=12, pady=12, sticky="w")
-        cmb_target = ctk.CTkComboBox(sub_frm, values=CURRENCIES, width=140, font=ctk.CTkFont(size=13))
+        ctk.CTkLabel(input_frm, text="Target Currency (set once)", font=ctk.CTkFont(size=14)).grid(row=0, column=0,
+                                                                                                   padx=15, pady=15,
+                                                                                                   sticky="w")
+        cmb_target = ctk.CTkComboBox(input_frm, values=CURRENCIES, width=180, font=ctk.CTkFont(size=13))  # 增加宽度，改善体验
         cmb_target.set(self.ledger.target_currency)  # 设置默认值
-        cmb_target.grid(row=0, column=1, padx=12, pady=12)
-
-        # 设置目标货币按钮
-        btn_target = ctk.CTkButton(sub_frm, text="Set Target Currency", command=lambda: self._set_target_currency_dialog(cmb_target, dialog), width=220, font=ctk.CTkFont(size=14))
-        btn_target.grid(row=0, column=2, padx=12, pady=12)
-
-        # 如果已禁用或锁定，禁用按钮
-        if self.target_disabled or self.ledger.target_currency_locked:
-            btn_target.configure(state="disabled")
+        cmb_target.grid(row=0, column=1, padx=15, pady=15, sticky="ew")
 
         # 汇率显示标签
-        lbl_rate = ctk.CTkLabel(sub_frm, text="Current Default Rate: ", font=ctk.CTkFont(size=14))
-        lbl_rate.grid(row=1, column=0, columnspan=3, padx=24, pady=12)
-
-        # 获取并更新汇率显示
+        lbl_rate = ctk.CTkLabel(input_frm, text="Current Default Rate: ", font=ctk.CTkFont(size=14))
+        lbl_rate.grid(row=0, column=2, padx=15, pady=15, sticky="w")
         rate = get_exchange_rate(self.ledger.base_currency, self.ledger.target_currency)
         if rate:
             self.ledger.exchange_rate = rate
@@ -387,9 +392,22 @@ class App(ctk.CTk):
         else:
             lbl_rate.configure(text="Could not fetch exchange rate")
 
-        # 取消设置按钮
-        ctk.CTkButton(sub_frm, text="取消设置", command=dialog.destroy, width=220, font=ctk.CTkFont(size=14)).grid(row=2, column=1, padx=12, pady=12)
+        # 第二行：按钮框架
+        btn_frm = ctk.CTkFrame(input_frm, fg_color="transparent")  # 按钮专用框架
+        btn_frm.grid(row=1, column=0, columnspan=4, pady=20, sticky="e")  # 放置在右下，跨 4 列
 
+        # 设置目标货币按钮
+        btn_target = ctk.CTkButton(btn_frm, text="Set Target Currency",
+                                   command=lambda: self._set_target_currency_dialog(cmb_target, dialog), width=180,
+                                   font=ctk.CTkFont(size=14))  # 减小宽度
+        btn_target.pack(side="left", padx=10)  # 左右间距 10，与取消按钮并排
+        if self.target_disabled or self.ledger.target_currency_locked:
+            btn_target.configure(state="disabled")
+
+        # 取消按钮
+        btn_cancel = ctk.CTkButton(btn_frm, text="Cancel", command=dialog.destroy, width=180,
+                                   font=ctk.CTkFont(size=14))  # 统一宽度
+        btn_cancel.pack(side="left", padx=10)  # 并排显示
     def _set_target_currency_dialog(self, cmb_target, dialog):
         '''
         在对话框中设置目标货币，并处理成功/失败
@@ -408,67 +426,91 @@ class App(ctk.CTk):
     def _show_add_expense_dialog(self):
         '''
         显示添加支出对话框（弹窗）
-        - 窗口大小 1200x400
+        - 窗口大小 1000x450（缩小宽度，增加高度以容纳控件）
         - grab_set() 置顶阻塞主窗口
-        - 布局：标题、输入框架（日期、金额、货币、类别、备注、预算、按钮）
+        - 布局：标题、输入框架（三行网格：第一行日期/金额/货币/类别，第二行备注，第三行预算/按钮）
+        - 优化：调整网格列权重，增加间距，确保“取消”按钮可见，备注字段跨列合理
         '''
         dialog = ctk.CTkToplevel(self)  # 创建置顶窗口
         dialog.title("Add Expense")  # 设置标题
-        dialog.geometry("1200x400")  # 设置大小
-        dialog.grab_set()  # 置顶阻塞
+        dialog.geometry("1500x450")  # 调整窗口大小，宽度减小避免拥挤，高度增加容纳控件
+        dialog.grab_set()  # 置顶并阻塞主窗口
+
+        # 配置窗口网格，确保扩展合理
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(1, weight=1)
 
         lbl_title = ctk.CTkLabel(dialog, text="Add Expense", font=ctk.CTkFont(size=20, weight="bold"))  # 标题
-        lbl_title.pack(pady=12)
+        lbl_title.pack(pady=20)  # 增加垂直间距，改善视觉层次
 
-        input_frm = ctk.CTkFrame(dialog, fg_color="transparent")  # 输入框架
-        input_frm.pack(fill="x", padx=24, pady=12)
+        input_frm = ctk.CTkFrame(dialog, fg_color="transparent")  # 输入框架，透明背景
+        input_frm.pack(fill="x", padx=30, pady=20)  # 增加水平间距（30）并填充 x 方向
 
+        # 配置输入框架网格，分配列权重以平衡布局
+        input_frm.grid_columnconfigure((0, 2, 4, 6), weight=1)  # 标签列
+        input_frm.grid_columnconfigure((1, 3, 5, 7), weight=2)  # 输入框列
+        input_frm.grid_columnconfigure(8, weight=3)  # 按钮列，留更多空间
+
+        # 第一行：日期、金额、货币、类别输入
         # 日期输入
-        ctk.CTkLabel(input_frm, text="Date (YYYY-MM-DD)", font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=12, pady=8, sticky="w")
-        ent_date = ctk.CTkEntry(input_frm, width=160, font=ctk.CTkFont(size=13))
+        ctk.CTkLabel(input_frm, text="Date (YYYY-MM-DD)", font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=15,
+                                                                                          pady=10, sticky="w")
+        ent_date = ctk.CTkEntry(input_frm, width=180, font=ctk.CTkFont(size=13))  # 增加宽度，改善输入体验
         ent_date.insert(0, datetime.now().strftime("%Y-%m-%d"))  # 默认当前日期
-        ent_date.grid(row=0, column=1, padx=12, pady=8)
+        ent_date.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
         # 金额输入
-        ctk.CTkLabel(input_frm, text="Amount", font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=12, pady=8, sticky="w")
-        ent_amount = ctk.CTkEntry(input_frm, width=140, font=ctk.CTkFont(size=13))
-        ent_amount.grid(row=0, column=3, padx=12, pady=8)
+        ctk.CTkLabel(input_frm, text="Amount", font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=15, pady=10,
+                                                                               sticky="w")
+        ent_amount = ctk.CTkEntry(input_frm, width=160, font=ctk.CTkFont(size=13))
+        ent_amount.grid(row=0, column=3, padx=15, pady=10, sticky="ew")
 
         # 货币选择
-        ctk.CTkLabel(input_frm, text="Currency", font=ctk.CTkFont(size=14)).grid(row=0, column=4, padx=12, pady=8, sticky="w")
-        cmb_currency = ctk.CTkComboBox(input_frm, values=CURRENCIES, width=120, font=ctk.CTkFont(size=13))
+        ctk.CTkLabel(input_frm, text="Currency", font=ctk.CTkFont(size=14)).grid(row=0, column=4, padx=15, pady=10,
+                                                                                 sticky="w")
+        cmb_currency = ctk.CTkComboBox(input_frm, values=CURRENCIES, width=140, font=ctk.CTkFont(size=13))
         cmb_currency.set(self.ledger.base_currency)  # 默认基础货币
-        cmb_currency.grid(row=0, column=5, padx=12, pady=8)
+        cmb_currency.grid(row=0, column=5, padx=15, pady=10, sticky="ew")
 
         # 类别选择
-        ctk.CTkLabel(input_frm, text="Category", font=ctk.CTkFont(size=14)).grid(row=0, column=6, padx=12, pady=8, sticky="w")
-        cmb_cat = ctk.CTkComboBox(input_frm, values=CATEGORIES, width=160, font=ctk.CTkFont(size=13))
+        ctk.CTkLabel(input_frm, text="Category", font=ctk.CTkFont(size=14)).grid(row=0, column=6, padx=15, pady=10,
+                                                                                 sticky="w")
+        cmb_cat = ctk.CTkComboBox(input_frm, values=CATEGORIES, width=180, font=ctk.CTkFont(size=13))
         cmb_cat.set(CATEGORIES[0])  # 默认第一个类别
-        cmb_cat.grid(row=0, column=7, padx=12, pady=8)
+        cmb_cat.grid(row=0, column=7, padx=15, pady=10, sticky="ew")
 
-        # 备注输入
-        ctk.CTkLabel(input_frm, text="Note", font=ctk.CTkFont(size=14)).grid(row=1, column=0, padx=12, pady=8, sticky="w")
-        ent_note = ctk.CTkEntry(input_frm, width=900, font=ctk.CTkFont(size=13))
-        ent_note.grid(row=1, column=1, columnspan=8, padx=12, pady=8, sticky="we")
+        # 第二行：备注输入
+        ctk.CTkLabel(input_frm, text="Note", font=ctk.CTkFont(size=14)).grid(row=1, column=0, padx=15, pady=10,
+                                                                             sticky="w")
+        ent_note = ctk.CTkEntry(input_frm, width=800, font=ctk.CTkFont(size=13))  # 减少宽度（900→800），避免挤压按钮
+        ent_note.grid(row=1, column=1, columnspan=7, padx=15, pady=10, sticky="ew")  # 跨 7 列，留空间给按钮
 
-        # 月预算输入
-        ctk.CTkLabel(input_frm, text="Monthly Budget", font=ctk.CTkFont(size=14)).grid(row=2, column=0, padx=12, pady=12, sticky="w")
-        ent_budget = ctk.CTkEntry(input_frm, width=140, font=ctk.CTkFont(size=13))
+        # 第三行：月预算和按钮
+        ctk.CTkLabel(input_frm, text="Monthly Budget", font=ctk.CTkFont(size=14)).grid(row=2, column=0, padx=15,
+                                                                                       pady=15, sticky="w")
+        ent_budget = ctk.CTkEntry(input_frm, width=160, font=ctk.CTkFont(size=13))
         ent_budget.insert(0, str(self.ledger.month_budget))  # 默认当前预算
-        ent_budget.grid(row=2, column=1, padx=12, pady=12)
-        btn_budget = ctk.CTkButton(input_frm, text="Set Budget", command=lambda: self._set_budget_dialog(ent_budget.get()), width=160, font=ctk.CTkFont(size=14))
-        btn_budget.grid(row=2, column=2, padx=12, pady=12)
-
+        ent_budget.grid(row=2, column=1, padx=15, pady=15, sticky="ew")
+        btn_budget = ctk.CTkButton(input_frm, text="Set Budget",
+                                   command=lambda: self._set_budget_dialog(ent_budget.get()), width=160,
+                                   font=ctk.CTkFont(size=14))
+        btn_budget.grid(row=2, column=2, padx=15, pady=15, sticky="ew")
         if self.budget_disabled:  # 如果已禁用，禁用按钮
             btn_budget.configure(state="disabled")
 
-        # 添加按钮
-        btn_add = ctk.CTkButton(input_frm, text="Add", command=lambda: self._on_add_dialog(ent_date.get(), ent_amount.get(), cmb_currency.get(), cmb_cat.get(), ent_note.get(), ent_amount, ent_note, dialog), width=160, font=ctk.CTkFont(size=14))
-        btn_add.grid(row=2, column=7, padx=12, pady=12)
+        # 按钮框架，确保“添加”和“取消”按钮在同一行且对齐
+        btn_frm = ctk.CTkFrame(input_frm, fg_color="transparent")
+        btn_frm.grid(row=2, column=6, columnspan=2, padx=15, pady=15, sticky="e")
 
-        # 取消按钮
-        ctk.CTkButton(input_frm, text="Cancel", command=dialog.destroy, width=160, font=ctk.CTkFont(size=14)).grid(row=2, column=8, padx=12, pady=12)
+        btn_add = ctk.CTkButton(btn_frm, text="Add",
+                                command=lambda: self._on_add_dialog(ent_date.get(), ent_amount.get(),
+                                                                    cmb_currency.get(), cmb_cat.get(), ent_note.get(),
+                                                                    ent_amount, ent_note, dialog), width=160,
+                                font=ctk.CTkFont(size=14))
+        btn_add.pack(side="left", padx=10)  # 左右间距 10
 
+        btn_cancel = ctk.CTkButton(btn_frm, text="Cancel", command=dialog.destroy, width=160, font=ctk.CTkFont(size=14))
+        btn_cancel.pack(side="left", padx=10)  # 确保“取消”按钮与“添加”并排显示
     def _on_add_dialog(self, date, amt, currency, cat, note, ent_amount, ent_note, dialog):
         '''
         在对话框中处理添加支出
@@ -771,19 +813,22 @@ class App(ctk.CTk):
     def _open_charts(self):
         '''
         打开图表窗口
-        - 如果已存在，焦点置顶
-        - 创建新窗口，添加 Notebook（饼图、条形图、日趋势线）
+        - 如果窗口已存在，焦点置顶
+        - 创建新窗口，使用 CTkTabview 展示饼图、条形图、日趋势线
         - 如果无数据，显示消息并关闭
+        - 优化：调整 CTkTabview 标签导航居中对齐图表，优化窗口大小（900x650），统一 customtkinter 风格（暗模式，绿色主题）
         '''
-        if self.chart_win and self.chart_win.winfo_exists():  # 如果存在，焦点
+        if self.chart_win and self.chart_win.winfo_exists():  # 如果窗口存在，焦点置顶
             self.chart_win.focus()
             return
 
-        self.chart_win = ctk.CTkToplevel(self)  # 创建新窗口
+        self.chart_win = ctk.CTkToplevel(self)  # 创建新 CTk 窗口
         win = self.chart_win
-        win.title("Charts - This Month")  # 标题
-        win.geometry("1000x700")  # 大小
-
+        win.title("Charts - This Month")  # 设置标题
+        win.geometry("500x450")  # 调整窗口大小，宽度略减，高度优化以适配布局
+        win.grab_set()  # 置顶并阻塞主窗口
+        win.grid_columnconfigure(0, weight=1)  # 列扩展
+        win.grid_rowconfigure(1, weight=1)  # 内容行扩展
         def _on_close():  # 关闭处理
             try:
                 win.destroy()
@@ -792,69 +837,88 @@ class App(ctk.CTk):
 
         win.protocol("WM_DELETE_WINDOW", _on_close)  # 设置关闭协议
 
-        nb = ttk.Notebook(win)  # Notebook
-        nb.pack(fill="both", expand=True, padx=24, pady=16)  # 填充扩展
+        # 标题
+        lbl_title = ctk.CTkLabel(win, text="Monthly Spending Charts", font=ctk.CTkFont(size=20, weight="bold"))
+        lbl_title.pack(pady=15)  # 减少垂直间距，适配更紧凑的窗口
 
-        sums = self.ledger.summary_by_category()  # 获取汇总
+        # 检查数据
+        sums = self.ledger.summary_by_category()  # 获取类别汇总
         if not sums:
-            messagebox.showinfo("Charts", "No records this month yet.")  # 无数据
+            messagebox.showinfo("Charts", "No records this month yet.")  # 无数据提示
             _on_close()
             return
-        labels = list(sums.keys())  # 标签
-        values = list(sums.values())  # 值
+        labels = list(sums.keys())  # 类别标签
+        values = list(sums.values())  # 类别金额
+
+        # 创建 CTkTabview，设置绿色主题，居中对齐
+        tabview = ctk.CTkTabview(win, fg_color="transparent", segmented_button_selected_color="#2e7d32",
+                                 width=800)  # 固定宽度，居中
+        tabview.pack(pady=15, padx=50, fill="x")  # 居中，水平填充，增加间距
 
         # 饼图页
-        frm_pie = ctk.CTkFrame(nb)
-        nb.add(frm_pie, text="Pie by Category")  # 添加页
-        fig1 = Figure(figsize=(7, 5), dpi=100)  # 创建图
-        ax1 = fig1.add_subplot(111)
-        ax1.pie(values, labels=labels, autopct="%1.1f%%", startangle=90, counterclock=False)  # 绘饼图
+        tabview.add("Pie by Category")  # 添加标签页
+        frm_pie = ctk.CTkFrame(tabview.tab("Pie by Category"), fg_color="transparent")
+        frm_pie.grid(row=0, column=0, sticky="nsew")
+        frm_pie.grid_columnconfigure(0, weight=1)
+        frm_pie.grid_rowconfigure(0, weight=1)
+        fig1 = Figure(figsize=(6.5, 4.5), dpi=100, facecolor="#2a2d2e")  # 略减图表尺寸，适配窗口
+        ax1 = fig1.add_subplot(111, facecolor="#2a2d2e")
+        ax1.pie(values, labels=labels, autopct="%1.1f%%", startangle=90, counterclock=False,
+                textprops={'color': 'white', 'fontsize': 12})  # 白色文字
         ax1.axis("equal")  # 等轴
-        fig1.tight_layout()  # 紧凑布局
-        c1 = FigureCanvasTkAgg(fig1, frm_pie)  # 画布
-        c1.draw()  # 绘制
-        c1.get_tk_widget().pack(fill="both", expand=True)  # 打包
-        NavigationToolbar2Tk(c1, frm_pie).update()  # 工具栏
+        fig1.tight_layout()
+        c1 = FigureCanvasTkAgg(fig1, master=frm_pie)
+        c1.draw()
+        c1.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=15)  # 增加间距
 
         # 条形图页
-        frm_bar = ctk.CTkFrame(nb)
-        nb.add(frm_bar, text="Bar by Category")
-        fig2 = Figure(figsize=(7, 5), dpi=100)
-        ax2 = fig2.add_subplot(111)
-        ax2.bar(labels, values)  # 绘条形图
-        ax2.set_ylabel("Amount")  # y 轴标签
-        ax2.set_xlabel("Category")  # x 轴标签
-        ax2.set_title("Spending by Category (This Month)")  # 标题
-        ax2.tick_params(axis='x', rotation=25)  # x 轴旋转
+        tabview.add("Bar by Category")
+        frm_bar = ctk.CTkFrame(tabview.tab("Bar by Category"), fg_color="transparent")
+        frm_bar.grid(row=0, column=0, sticky="nsew")
+        frm_bar.grid_columnconfigure(0, weight=1)
+        frm_bar.grid_rowconfigure(0, weight=1)
+        fig2 = Figure(figsize=(6.5, 4.5), dpi=100, facecolor="#2a2d2e")
+        ax2 = fig2.add_subplot(111, facecolor="#2a2d2e")
+        ax2.bar(labels, values, color="#388e3c")  # 绿色条形
+        ax2.set_ylabel("Amount", color="white", fontsize=12)
+        ax2.set_xlabel("Category", color="white", fontsize=12)
+        ax2.set_title("Spending by Category (This Month)", color="white", fontsize=14)
+        ax2.tick_params(axis='x', rotation=25, colors="white")  # 白色刻度
+        ax2.tick_params(axis='y', colors="white")
         fig2.tight_layout()
-        c2 = FigureCanvasTkAgg(fig2, frm_bar)
+        c2 = FigureCanvasTkAgg(fig2, master=frm_bar)
         c2.draw()
-        c2.get_tk_widget().pack(fill="both", expand=True)
-        NavigationToolbar2Tk(c2, frm_bar).update()
+        c2.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=15)
 
         # 日趋势线页
-        frm_line = ctk.CTkFrame(nb)
-        nb.add(frm_line, text="Daily Trend")
-        fig3 = Figure(figsize=(7, 5), dpi=100)
-        ax3 = fig3.add_subplot(111)
+        tabview.add("Daily Trend")
+        frm_line = ctk.CTkFrame(tabview.tab("Daily Trend"), fg_color="transparent")
+        frm_line.grid(row=0, column=0, sticky="nsew")
+        frm_line.grid_columnconfigure(0, weight=1)
+        frm_line.grid_rowconfigure(0, weight=1)
+        fig3 = Figure(figsize=(6.5, 4.5), dpi=100, facecolor="#2a2d2e")
+        ax3 = fig3.add_subplot(111, facecolor="#2a2d2e")
         daily = self.ledger.daily_totals_this_month()  # 获取每日总计
         if daily:
-            x = [d for d, _ in daily]  # x 轴日期
-            y = [v for _, v in daily]  # y 轴金额
-            ax3.plot(x, y, marker="o")  # 绘线图
-            ax3.set_xlabel("Date")  # x 标签
-            ax3.set_ylabel("Amount")  # y 标签
-            ax3.set_title("Daily Total (This Month)")  # 标题
-            for lab in ax3.get_xticklabels():  # 旋转 x 标签
+            x = [d for d, _ in daily]  # 日期
+            y = [v for _, v in daily]  # 金额
+            ax3.plot(x, y, marker="o", color="#388e3c", linewidth=2)  # 绿色线条
+            ax3.set_xlabel("Date", color="white", fontsize=12)
+            ax3.set_ylabel("Amount", color="white", fontsize=12)
+            ax3.set_title("Daily Total (This Month)", color="white", fontsize=14)
+            for lab in ax3.get_xticklabels():
                 lab.set_rotation(35)
                 lab.set_ha("right")
+                lab.set_color("white")  # 白色刻度
+            ax3.tick_params(axis='y', colors="white")
         else:
-            ax3.text(0.5, 0.5, "No data", ha="center", va="center")  # 无数据文本
+            ax3.text(0.5, 0.5, "No data", ha="center", va="center", color="white", fontsize=14)
         fig3.tight_layout()
-        c3 = FigureCanvasTkAgg(fig3, frm_line)
+        c3 = FigureCanvasTkAgg(fig3, master=frm_line)
         c3.draw()
-        c3.get_tk_widget().pack(fill="both", expand=True)
-        NavigationToolbar2Tk(c3, frm_line).update()
+        c3.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=15)
+
+        tabview.set("Pie by Category")  # 默认选中饼图页
 
 
 if __name__ == "__main__":
